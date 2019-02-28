@@ -1,0 +1,116 @@
+/* Class name  : ContentDocumentLinkTriggerHandler
+ * Description : This is a handler class to sync files between deal and deal1.
+ * Company     : Standav
+ *  ---------------------------------------------
+ *      Developer            Created date
+ 
+        Siva K               25/05/2018
+ *  --------------------------------------------
+ */
+public class ContentDocumentLinkTriggerHandler {
+    
+    private final static SObjectType PARENT_OPPTY     = Opportunity.SObjectType;
+    private final static SObjectType PARENT_DEAL1     = Deal1__c.SObjectType;
+    private final static SObjectType USER             = User.SObjectType;
+    private final static boolean RecursionHandler     = true;
+
+    public static void onAfterInsert(List<ContentDocumentLink> TriggerNew){
+
+        Map<Id,ContentDocumentLink> contentDocumentwithLinkMap = new Map<Id,ContentDocumentLink>();
+        Map<Id,ContentVersion> oldContentVersionMap = new Map<Id,ContentVersion>();
+        Map<Id,ContentVersion> newContentVersionMap = new Map<Id,ContentVersion>();
+
+        if(!newRecords.isEmpty()){
+            
+            system.debug('--TriggerNew'+TriggerNew);
+            Map<Id,Id> LEwithObjToUpdateMap = new Map<Id,Id>();
+            
+                for (ContentDocumentLink cdl :TriggerNew){
+                   // ContentDocIdList.add(a.ContentDocumentId);
+                    SObjectType parentType = cdl.LinkedEntityId.getSObjectType();
+                    
+                    if(parentType == PARENT_OPPTY || parentType == PARENT_DEAL1){
+                        LEwithObjToUpdateMap.put(cdl.LinkedEntityId, null);
+                        contentDocumentwithLinkMap.put(cdl.ContentDocumentId,cdl);
+                    
+                    }
+                }
+            }
+        }
+
+        system.debug('contentDocumentwithLinkMap ---> '+contentDocumentwithLinkMap);
+            
+        list<Deal1__c> DealList = List<Deal1__c>();
+
+        if(!LEwithObjToUpdateMap.IsEmpty()){
+            DealList = [SELECT Id,Deal__c FROM Deal1__c WHERE Deal__c IN:LEwithObjToUpdateMap.keyset() OR Id IN:LEwithObjToUpdateMap.keyset()];
+
+        }        
+               
+        system.debug('DealList--->'+DealList);
+        if(!DealList.isEmpty()){
+            for(Deal1__c deal : DealList){
+                if(LEwithObjToUpdateMap.containskey(deal.Deal__c){
+                    LEwithObjToUpdateMap.put(deal.Deal__c, deal.Id);
+                }
+                else if(LEwithObjToUpdateMap.containskey(deal.Id)){
+                    LEwithObjToUpdateMap.put(deal.Id, deal.Deal__c);
+                }
+            }
+        }
+        system.debug('LEwithObjToUpdateMap--->'+LEwithObjToUpdateMap);
+
+        if(!contentDocumentwithLinkMap.IsEmpty()){
+
+            for(ContentVersion cnv : [select id,Title,VersionData,ContentLocation,PathOnClient,ContentDocumentId from ContentVersion where ContentDocumentId IN: contentDocumentwithLinkMap.keyset()]){
+            oldcontentVersionMap.put(cnv.ContentDocumentId,cnv);
+            }   
+        }
+
+        if(!oldcontentVersionMap.IsEmpty()){
+            for(Id cDocId : oldcontentVersionMap.keyset()){
+                ContentVersion prevContentVersion = oldcontentVersionMap.get(cDocId);
+                ContentVersion conVer = new ContentVersion();
+                conVer.ContentLocation = 'S'; // S specify this document is in SF, use E for external files
+                conVer.PathOnClient = prevContentVersion.PathOnClient; // The files name, extension is very important here which will help the file in preview.
+                conVer.Title = prevContentVersion.Title; // Display name of the files
+                conVer.VersionData = prevContentVersion.VersionData;
+                newContentVersionMap.put(prevContentVersion.ContentDocumentId,conVer);
+            }               
+            INSERT newContentVersionMap.values();
+        }
+        
+        system.debug('newContentVersionMap.values()---->'+newContentVersionMap.values());
+        
+        Map<Id,Id> oldAndNewContDocMap= new  Map<Id,Id>();
+        
+        if(!oldcontentVersionMap.IsEmpty()){
+            for(id cDocId : newContentVersionMap.keySet()){
+                Contentversion newConId = newContentVersionMap.get(cDocId);
+                oldAndNewContDocMap.put(cDocId,newConId.ContentDocumentId);
+            }
+        }
+        system.debug('oldAndNewContDocMap ---> '+oldAndNewContDocMap);
+
+        map<Id,ContentDocumentLink> newContentDocumentLinkMap = new map<Id,ContentDocumentLink>();
+        if(!contentDocumentwithLinkMap.isEmpty()){
+            for(id cDocId : contentDocumentwithLinkMap.keyset()){
+                Id prevConLinkEntityId = contentDocumentwithLinkMap.get(cDocId).LinkedEntityId;
+                ContentDocumentLink cdl = new ContentDocumentLink();
+                cdl.ContentDocumentId = oldAndNewContDocMap.get(cDocId);
+                cdl.LinkedEntityId = LEwithObjToUpdateMap.get(prevConLinkEntityId); // you can use objectId,GroupId etc
+                cdl.ShareType = 'I';
+                newContentDocumentLinkMap.put(cdl.ContentDocumentId,cdl);
+            }    
+        }
+        
+        system.debug(' ---> '+newContentDocumentLinkMap.values());
+        insert newContentDocumentLinkMap.values();
+    }
+}
+    
+      
+                
+
+        
+                
